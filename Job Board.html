@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Job Board with JS + Modal Apply Form</title>
+  <style>
+    /* ------------ Base layout ------------ */
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f0f2f5;color:#333}
+    header{background:#003d7a;color:#fff;padding:20px 0;text-align:center}
+    .container{max-width:900px;margin:30px auto;padding:0 20px}
+
+    /* ------------ Job cards ------------ */
+    .job-card{background:#fff;border-radius:8px;padding:20px;margin-bottom:18px;
+              box-shadow:0 3px 6px rgba(0,0,0,.08);transition:transform .2s}
+    .job-card:hover{transform:translateY(-2px)}
+    .job-card h3{margin:0 0 6px;color:#222}
+    .job-meta{font-size:14px;color:#777;margin-bottom:10px}
+    .job-desc{margin-bottom:12px}
+    .apply-btn{background:#1e8e3e;color:#fff;padding:9px 16px;border:none;
+               border-radius:5px;cursor:pointer}
+    .apply-btn:hover{background:#16692e}
+
+    /* ------------ Post‑job form ------------ */
+    form{background:#fff;padding:22px;border-radius:8px;
+         box-shadow:0 3px 6px rgba(0,0,0,.08);margin-top:45px}
+    form input,form textarea{width:100%;padding:10px;border:1px solid #ccc;
+                              border-radius:4px;margin-bottom:14px;font-size:15px}
+    form button{background:#003d7a;color:#fff;padding:10px 16px;border:none;
+                border-radius:4px;cursor:pointer}
+    form button:hover{background:#012c59}
+
+    /* ------------ Modal ------------ */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;
+           align-items:center;justify-content:center;z-index:100;visibility:hidden;opacity:0;
+           transition:opacity .25s ease}
+    .modal.show{visibility:visible;opacity:1}
+    .modal-content{background:#fff;border-radius:8px;width:90%;max-width:480px;
+                   padding:25px;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative}
+    .modal-content h3{margin-top:0}
+    .close-btn{position:absolute;top:10px;right:14px;font-size:22px;border:none;
+               background:none;cursor:pointer;color:#666}
+    .close-btn:hover{color:#000}
+
+    /* ------------ Toast ------------ */
+    .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+           background:#1e8e3e;color:#fff;padding:12px 20px;border-radius:6px;
+           box-shadow:0 3px 8px rgba(0,0,0,.2);opacity:0;pointer-events:none;
+           transition:opacity .3s ease}
+    .toast.show{opacity:1}
+    @media(max-width:600px){.job-card{padding:16px}}
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Job Board</h1>
+    <p>Explore job openings and apply easily</p>
+  </header>
+
+  <!-- ----------- JOB LIST ----------- -->
+  <div class="container" id="job-list"></div>
+
+  <!-- ----------- POST‑JOB FORM ----------- -->
+  <div class="container">
+    <form id="job-form">
+      <h2>Post a New Job</h2>
+      <input id="title" placeholder="Job Title" required />
+      <input id="company" placeholder="Company Name" required />
+      <input id="location" placeholder="Location" required />
+      <input id="salary" placeholder="Salary" required />
+      <textarea id="description" rows="4" placeholder="Job Description" required></textarea>
+      <button type="submit">Add Job</button>
+    </form>
+  </div>
+
+  <!-- ----------- APPLY MODAL ----------- -->
+  <div class="modal" id="apply-modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeModal()">×</button>
+      <h3 id="apply-job-title"></h3>
+      <form id="apply-form">
+        <input id="applicant-name" placeholder="Your Name" required />
+        <input id="applicant-email" type="email" placeholder="Email Address" required />
+        <textarea id="applicant-msg" rows="3" placeholder="Short Message (optional)"></textarea>
+        <button type="submit" class="apply-btn" style="width:100%;margin-top:6px">Submit Application</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ----------- TOAST ----------- -->
+  <div id="toast" class="toast">Application submitted!</div>
+
+  <script>
+    /* ------------ Data store ------------ */
+    const jobs = [
+      {title:"Frontend Developer",company:"Google",location:"Remote",salary:"₹10L ‑ ₹15L",
+       description:"Build user interfaces using React, HTML, and CSS."},
+      {title:"AI Engineer",company:"OpenAI",location:"Bangalore",salary:"₹20L+",
+       description:"Work on AI models and tools."}
+    ];
+    const applications = [];   // {jobTitle, name, email, msg}
+
+    /* ------------ Render jobs ------------ */
+    const jobList = document.getElementById('job-list');
+    function renderJobs(){
+      jobList.innerHTML='';
+      jobs.forEach((job,i)=>{
+        const card=document.createElement('div');
+        card.className='job-card';
+        card.innerHTML=`
+          <h3>${job.title}</h3>
+          <div class="job-meta">${job.company} • ${job.location} • ${job.salary}</div>
+          <div class="job-desc">${job.description}</div>
+          <button class="apply-btn" data-index="${i}">Apply Now</button>`;
+        jobList.appendChild(card);
+      });
+    }
+    renderJobs();
+
+    /* ------------ Open / close modal ------------ */
+    const modal      = document.getElementById('apply-modal');
+    const modalTitle = document.getElementById('apply-job-title');
+    let currentJobIndex = null;
+
+    jobList.addEventListener('click',e=>{
+      if(e.target.matches('.apply-btn')){
+        currentJobIndex = +e.target.dataset.index;
+        modalTitle.textContent='Apply for: '+jobs[currentJobIndex].title;
+        modal.classList.add('show');
+      }
+    });
+    function closeModal(){
+      modal.classList.remove('show');
+      document.getElementById('apply-form').reset();
+    }
+    modal.addEventListener('click',e=>{
+      if(e.target===modal) closeModal();   // click outside content
+    });
+
+    /* ------------ Handle application submit ------------ */
+    document.getElementById('apply-form').addEventListener('submit',e=>{
+      e.preventDefault();
+      const name = document.getElementById('applicant-name').value.trim();
+      const email= document.getElementById('applicant-email').value.trim();
+      const msg  = document.getElementById('applicant-msg').value.trim();
+      applications.push({jobTitle:jobs[currentJobIndex].title,name,email,msg});
+      closeModal();
+      showToast('🎉 Application sent for “'+jobs[currentJobIndex].title+'”');
+      console.log('Applications:',applications);   // dev log
+    });
+
+    /* ------------ Post‑job form ------------ */
+    const postForm = document.getElementById('job-form');
+    postForm.addEventListener('submit',e=>{
+      e.preventDefault();
+      const newJob={
+        title:document.getElementById('title').value,
+        company:document.getElementById('company').value,
+        location:document.getElementById('location').value,
+        salary:document.getElementById('salary').value,
+        description:document.getElementById('description').value
+      };
+      jobs.push(newJob);
+      renderJobs();
+      postForm.reset();
+      showToast('✅ Job added successfully!');
+    });
+
+    /* ------------ Toast helper ------------ */
+    const toast=document.getElementById('toast');
+    function showToast(msg){
+      toast.textContent=msg;
+      toast.classList.add('show');
+      setTimeout(()=>toast.classList.remove('show'),2600);
+    }
+  </script>
+
+</body>
+</html>
